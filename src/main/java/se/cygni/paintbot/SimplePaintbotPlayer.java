@@ -12,14 +12,20 @@ import se.cygni.paintbot.api.model.GameSettings;
 import se.cygni.paintbot.api.model.PlayerPoints;
 import se.cygni.paintbot.api.response.PlayerRegistered;
 import se.cygni.paintbot.api.util.GameSettingsUtils;
+// import se.cygni.paintbot.client.*;
+
 import se.cygni.paintbot.client.AnsiPrinter;
 import se.cygni.paintbot.client.BasePaintbotClient;
 import se.cygni.paintbot.client.MapUtility;
+import se.cygni.paintbot.client.MapCoordinate;
 import se.cygni.paintbot.client.MapUtilityImpl;
+import java.util.stream.Collectors;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+
+// import javax.swing.colorchooser.ColorChooserComponentFactory;
 
 public class SimplePaintbotPlayer extends BasePaintbotClient {
 
@@ -82,27 +88,89 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
 
         // MapUtil contains lot's of useful methods for querying the map!
         MapUtility mapUtil = new MapUtilityImpl(mapUpdateEvent.getMap(), getPlayerId());
+        
+        // Check if we're carrying a power up, if we do -> EXPLODE
+        if(mapUtil.getMyCharacterInfo().isCarryingPowerUp()) {
+            registerMove(mapUpdateEvent.getGameTick(), CharacterAction.EXPLODE);
+            return;
+        } 
 
-        List<CharacterAction> actions = new ArrayList<>();
+        // Init chosenAction
+        CharacterAction chosenAction = CharacterAction.STAY;
+
+        // Create a list of possible actions
+        List<CharacterAction> possibleActions = new ArrayList<>();
 
         // Let's see in which movement actions I can take
         for (CharacterAction action : CharacterAction.values()) {
             if (mapUtil.canIMoveInDirection(action)) {
-                actions.add(action);
+                possibleActions.add(action);
             }
         }
-
-        // Check if we're carrying a power up
-        if(mapUtil.getMyCharacterInfo().isCarryingPowerUp()) {
-            actions.add(CharacterAction.EXPLODE);
+        
+        // Getting the closest powerup
+        MapCoordinate[] powerUpsCoords = mapUtil.getCoordinatesContainingPowerUps();
+        MapCoordinate playerCoord = mapUtil.getMyCoordinate();
+        MapCoordinate closestCoordPowerUp = null;
+        int closestManhattanPowerUp = Integer.MAX_VALUE;
+    
+        if (powerUpsCoords != null) { 
+            for (MapCoordinate coord : powerUpsCoords) {
+                if (closestCoordPowerUp == null) {
+                    closestCoordPowerUp = coord;
+                    closestManhattanPowerUp = playerCoord.getManhattanDistanceTo(coord);
+                }
+                else {
+                    if (playerCoord.getManhattanDistanceTo(coord) < closestManhattanPowerUp) {
+                        closestCoordPowerUp = coord;
+                        closestManhattanPowerUp = playerCoord.getManhattanDistanceTo(coord);
+                    }
+                }
+            }
         }
+        if (closestCoordPowerUp != null) {
+            List<CharacterAction> actionsPowerUp = new ArrayList<>();
+            
+            if (playerCoord.x < closestCoordPowerUp.x) {
+                actionsPowerUp.add(CharacterAction.RIGHT);
+            } 
+            else if (playerCoord.x > closestCoordPowerUp.x) {
+                actionsPowerUp.add(CharacterAction.LEFT);
+            }
 
-        Random r = new Random();
-        CharacterAction chosenAction = CharacterAction.STAY;
+            if (playerCoord.y < closestCoordPowerUp.y) {
+                actionsPowerUp.add(CharacterAction.DOWN);
+            } 
+            else if (playerCoord.y > closestCoordPowerUp.y) {
+                actionsPowerUp.add(CharacterAction.UP);
+            }
 
+            List<CharacterAction> validActionsPowerUp = actionsPowerUp.stream()
+                                        .filter(mapUtil::canIMoveInDirection)
+                                        .collect(Collectors.toList());
+
+            if (!validActionsPowerUp.isEmpty()) {
+                Random rand = new Random();
+                chosenAction = validActionsPowerUp.get(rand.nextInt(validActionsPowerUp.size()));
+                registerMove(mapUpdateEvent.getGameTick(), chosenAction);
+                return;
+            }                            
+            
+            /*
+            actionsPowerUp.retainAll(possibleActions);
+
+            if (!actionsPowerUp.isEmpty()) {
+                Random rand = new Random();
+                chosenAction = actionsPowerUp.get(rand.nextInt(actionsPowerUp.size()));
+                registerMove(mapUpdateEvent.getGameTick(), chosenAction);
+                return;
+            }*/
+        }
+        
         // Choose a random direction
-        if (!actions.isEmpty()) {
-            chosenAction = actions.get(r.nextInt(actions.size()));
+        Random rand = new Random();
+        if (!possibleActions.isEmpty()) {
+            chosenAction = possibleActions.get(rand.nextInt(possibleActions.size()));
         }
 
         // Register action here!
