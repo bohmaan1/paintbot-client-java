@@ -45,6 +45,8 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
     private static final boolean ANSI_PRINTER_ACTIVE = false;
     private AnsiPrinter ansiPrinter = new AnsiPrinter(ANSI_PRINTER_ACTIVE, true);
 
+    private long lastGameTickExplosion = 0;
+
     public static void main(String[] args) {
         SimplePaintbotPlayer simplePaintbotPlayer = new SimplePaintbotPlayer();
 
@@ -81,6 +83,14 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
         thread.start();
     }
 
+    /*
+     * If recently explode powerup -> pause explode for some ticks 
+     *  
+     * 
+     * 
+     */
+
+
     @Override
     public void onMapUpdate(MapUpdateEvent mapUpdateEvent) {
         // Do your implementation here! (or at least start from here, entry point for updates)
@@ -90,11 +100,16 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
         MapUtility mapUtil = new MapUtilityImpl(mapUpdateEvent.getMap(), getPlayerId());
         
         // Check if we're carrying a power up, if we do -> EXPLODE
-        if(mapUtil.getMyCharacterInfo().isCarryingPowerUp()) {
-            registerMove(mapUpdateEvent.getGameTick(), CharacterAction.EXPLODE);
-            return;
+        if (mapUtil.getMyCharacterInfo().isCarryingPowerUp()) {
+            
+            // Check if we recently exploded
+            if ((mapUpdateEvent.getGameTick()-lastGameTickExplosion) > 7) {
+                lastGameTickExplosion = mapUpdateEvent.getGameTick();
+                registerMove(mapUpdateEvent.getGameTick(), CharacterAction.EXPLODE);
+                return;
+            }
         } 
-
+        
         // Init chosenAction
         CharacterAction chosenAction = CharacterAction.STAY;
 
@@ -113,7 +128,8 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
         MapCoordinate playerCoord = mapUtil.getMyCoordinate();
         MapCoordinate closestCoordPowerUp = null;
         int closestManhattanPowerUp = Integer.MAX_VALUE;
-    
+        
+        // Calculate where the closest Power Up is
         if (powerUpsCoords != null) { 
             for (MapCoordinate coord : powerUpsCoords) {
                 if (closestCoordPowerUp == null) {
@@ -128,33 +144,58 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
                 }
             }
         }
+
+        // If we find a power up, calculate which direction to take
         if (closestCoordPowerUp != null) {
             List<CharacterAction> actionsPowerUp = new ArrayList<>();
-            
             if (playerCoord.x < closestCoordPowerUp.x) {
                 actionsPowerUp.add(CharacterAction.RIGHT);
-            } 
-            else if (playerCoord.x > closestCoordPowerUp.x) {
+            } else if (playerCoord.x > closestCoordPowerUp.x) {
                 actionsPowerUp.add(CharacterAction.LEFT);
             }
-
             if (playerCoord.y < closestCoordPowerUp.y) {
                 actionsPowerUp.add(CharacterAction.DOWN);
-            } 
-            else if (playerCoord.y > closestCoordPowerUp.y) {
+            } else if (playerCoord.y > closestCoordPowerUp.y) {
                 actionsPowerUp.add(CharacterAction.UP);
             }
 
+            // Filter out invalid moves, like going into obstacles 
             List<CharacterAction> validActionsPowerUp = actionsPowerUp.stream()
                                         .filter(mapUtil::canIMoveInDirection)
                                         .collect(Collectors.toList());
-
+            
+            // Move towards the power up if possible
             if (!validActionsPowerUp.isEmpty()) {
                 Random rand = new Random();
                 chosenAction = validActionsPowerUp.get(rand.nextInt(validActionsPowerUp.size()));
                 registerMove(mapUpdateEvent.getGameTick(), chosenAction);
                 return;
-            }                            
+            } 
+
+            // If it's not, there is an obstacle in front of us, then go around it
+            else {
+                if (actionsPowerUp.contains(CharacterAction.RIGHT) || actionsPowerUp.contains(CharacterAction.LEFT)) {
+                    validActionsPowerUp.add(CharacterAction.UP);
+                    validActionsPowerUp.add(CharacterAction.DOWN);
+                    validActionsPowerUp.retainAll(possibleActions);
+                    if (!validActionsPowerUp.isEmpty()) {
+                        Random rand = new Random();
+                        chosenAction = validActionsPowerUp.get(rand.nextInt(validActionsPowerUp.size()));
+                        registerMove(mapUpdateEvent.getGameTick(), chosenAction);
+                        return;
+                    }
+                } else if (actionsPowerUp.contains(CharacterAction.UP) || actionsPowerUp.contains(CharacterAction.DOWN)) {
+                    validActionsPowerUp.add(CharacterAction.RIGHT);
+                    validActionsPowerUp.add(CharacterAction.LEFT);
+                    validActionsPowerUp.retainAll(possibleActions);
+                    if (!validActionsPowerUp.isEmpty()) {
+                        Random rand = new Random();
+                        chosenAction = validActionsPowerUp.get(rand.nextInt(validActionsPowerUp.size()));
+                        registerMove(mapUpdateEvent.getGameTick(), chosenAction);
+                        return;
+                    }
+                }
+            }    
             
             /*
             actionsPowerUp.retainAll(possibleActions);
@@ -167,6 +208,8 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
             }*/
         }
         
+        MapCoordinate[] visitedCoords = mapUtil.getPlayerColouredCoordinates(getPlayerId());
+
         // Choose a random direction
         Random rand = new Random();
         if (!possibleActions.isEmpty()) {
