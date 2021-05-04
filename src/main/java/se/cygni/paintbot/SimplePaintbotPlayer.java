@@ -132,9 +132,12 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
             
             // Check if we recently exploded
             if ((mapUpdateEvent.getGameTick()-lastGameTickExplosion) > 7) {
-                lastGameTickExplosion = mapUpdateEvent.getGameTick();
-                registerMove(mapUpdateEvent.getGameTick(), CharacterAction.EXPLODE);
-                return;
+                List<CharacterAction> notVisitedActionsExplosion = getNotVisitedActions(mapUtil);
+                if (!notVisitedActionsExplosion.isEmpty()) {
+                    lastGameTickExplosion = mapUpdateEvent.getGameTick();
+                    registerMove(mapUpdateEvent.getGameTick(), CharacterAction.EXPLODE);
+                    return;
+                } 
             }
         } 
         
