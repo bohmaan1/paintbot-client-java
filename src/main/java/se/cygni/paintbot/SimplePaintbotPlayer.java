@@ -22,6 +22,7 @@ import se.cygni.paintbot.client.MapUtilityImpl;
 import java.util.stream.Collectors;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -46,6 +47,7 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
     private AnsiPrinter ansiPrinter = new AnsiPrinter(ANSI_PRINTER_ACTIVE, true);
 
     private long lastGameTickExplosion = 0;
+    private CharacterAction lastDirection = CharacterAction.STAY;
 
     public static void main(String[] args) {
         SimplePaintbotPlayer simplePaintbotPlayer = new SimplePaintbotPlayer();
@@ -83,13 +85,39 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
         thread.start();
     }
 
-    /*
-     * If recently explode powerup -> pause explode for some ticks 
-     *  
-     * 
-     * 
-     */
+    private List<CharacterAction> getNotVisitedActions(MapUtility mapUtil) {
 
+        MapCoordinate playerCoord = mapUtil.getMyCoordinate();
+
+        List<MapCoordinate> visitedCoords = Arrays.asList(mapUtil.getPlayerColouredCoordinates(getPlayerId()));
+        List<MapCoordinate> surroundingCoords = new ArrayList<>();
+        MapCoordinate playerCoordRight = new MapCoordinate(playerCoord.x+1,playerCoord.y);
+        MapCoordinate playerCoordLeft = new MapCoordinate(playerCoord.x-1,playerCoord.y);
+        MapCoordinate playerCoordDown = new MapCoordinate(playerCoord.x,playerCoord.y+1);
+        MapCoordinate playerCoordUp = new MapCoordinate(playerCoord.x,playerCoord.y-1);
+
+        surroundingCoords.add(playerCoordRight);
+        surroundingCoords.add(playerCoordLeft);
+        surroundingCoords.add(playerCoordDown);
+        surroundingCoords.add(playerCoordUp);
+
+        surroundingCoords.removeAll(visitedCoords);
+
+        List<CharacterAction> notVisitedActions = new ArrayList<>();
+
+        for (MapCoordinate coord : surroundingCoords) {
+            if (coord.x < playerCoord.x) {
+                notVisitedActions.add(CharacterAction.LEFT);
+            } else if (coord.x > playerCoord.x) {
+                notVisitedActions.add(CharacterAction.RIGHT);
+            } else if (coord.y < playerCoord.y) {
+                notVisitedActions.add(CharacterAction.UP);
+            } else if (coord.y > playerCoord.y) {
+                notVisitedActions.add(CharacterAction.DOWN);
+            }
+        }  
+        return (notVisitedActions);
+    }
 
     @Override
     public void onMapUpdate(MapUpdateEvent mapUpdateEvent) {
@@ -167,7 +195,14 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
             // Move towards the power up if possible
             if (!validActionsPowerUp.isEmpty()) {
                 Random rand = new Random();
-                chosenAction = validActionsPowerUp.get(rand.nextInt(validActionsPowerUp.size()));
+                List<CharacterAction> notVisitedActionsPowerUp = getNotVisitedActions(mapUtil);
+                notVisitedActionsPowerUp.retainAll(validActionsPowerUp);
+                if (!notVisitedActionsPowerUp.isEmpty()) {
+                    chosenAction = notVisitedActionsPowerUp.get(rand.nextInt(notVisitedActionsPowerUp.size()));
+                } else {
+                    chosenAction = validActionsPowerUp.get(rand.nextInt(validActionsPowerUp.size()));
+                }
+                lastDirection = chosenAction;
                 registerMove(mapUpdateEvent.getGameTick(), chosenAction);
                 return;
             } 
@@ -180,7 +215,17 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
                     validActionsPowerUp.retainAll(possibleActions);
                     if (!validActionsPowerUp.isEmpty()) {
                         Random rand = new Random();
-                        chosenAction = validActionsPowerUp.get(rand.nextInt(validActionsPowerUp.size()));
+
+                        List<CharacterAction> notVisitedActionsPowerUp = getNotVisitedActions(mapUtil);
+                        notVisitedActionsPowerUp.retainAll(validActionsPowerUp);
+                        
+                        if (!notVisitedActionsPowerUp.isEmpty()) {
+                            chosenAction = notVisitedActionsPowerUp.get(rand.nextInt(notVisitedActionsPowerUp.size()));
+                        } else {
+                            chosenAction = validActionsPowerUp.get(rand.nextInt(validActionsPowerUp.size()));
+                        }
+
+                        lastDirection = chosenAction;
                         registerMove(mapUpdateEvent.getGameTick(), chosenAction);
                         return;
                     }
@@ -190,7 +235,16 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
                     validActionsPowerUp.retainAll(possibleActions);
                     if (!validActionsPowerUp.isEmpty()) {
                         Random rand = new Random();
-                        chosenAction = validActionsPowerUp.get(rand.nextInt(validActionsPowerUp.size()));
+
+                        List<CharacterAction> notVisitedActionsPowerUp = getNotVisitedActions(mapUtil);
+                        notVisitedActionsPowerUp.retainAll(validActionsPowerUp);
+                        if (!notVisitedActionsPowerUp.isEmpty()) {
+                            chosenAction = notVisitedActionsPowerUp.get(rand.nextInt(notVisitedActionsPowerUp.size()));
+                        } else {
+                            chosenAction = validActionsPowerUp.get(rand.nextInt(validActionsPowerUp.size()));
+                        }
+
+                        lastDirection = chosenAction;
                         registerMove(mapUpdateEvent.getGameTick(), chosenAction);
                         return;
                     }
@@ -207,16 +261,62 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
                 return;
             }*/
         }
-        
-        MapCoordinate[] visitedCoords = mapUtil.getPlayerColouredCoordinates(getPlayerId());
+        /*
+        List<MapCoordinate> visitedCoords = Arrays.asList(mapUtil.getPlayerColouredCoordinates(getPlayerId()));
+        List<MapCoordinate> surroundingCoords = new ArrayList<>();
+        MapCoordinate playerCoordRight = new MapCoordinate(playerCoord.x+1,playerCoord.y);
+        MapCoordinate playerCoordLeft = new MapCoordinate(playerCoord.x-1,playerCoord.y);
+        MapCoordinate playerCoordDown = new MapCoordinate(playerCoord.x,playerCoord.y+1);
+        MapCoordinate playerCoordUp = new MapCoordinate(playerCoord.x,playerCoord.y-1);
 
-        // Choose a random direction
+        surroundingCoords.add(playerCoordRight);
+        surroundingCoords.add(playerCoordLeft);
+        surroundingCoords.add(playerCoordDown);
+        surroundingCoords.add(playerCoordUp);
+
+        surroundingCoords.removeAll(visitedCoords);
+
+        List<CharacterAction> notVisitedActions = new ArrayList<>();
+
+        for (MapCoordinate coord : surroundingCoords) {
+            if (coord.x < playerCoord.x) {
+                notVisitedActions.add(CharacterAction.LEFT);
+            } else if (coord.x > playerCoord.x) {
+                notVisitedActions.add(CharacterAction.RIGHT);
+            } else if (coord.y < playerCoord.y) {
+                notVisitedActions.add(CharacterAction.UP);
+            } else if (coord.y > playerCoord.y) {
+                notVisitedActions.add(CharacterAction.DOWN);
+            }
+        }  
+        */
+
+        List<CharacterAction> notVisitedActions = getNotVisitedActions(mapUtil);
+
+        // If anything above doesn't apply then have the following priority
+        // 1. Go to an unvisited coord
+        // 2. Continue in the same direction that you had before
+        // 3. Choose a random direction
         Random rand = new Random();
         if (!possibleActions.isEmpty()) {
-            chosenAction = possibleActions.get(rand.nextInt(possibleActions.size()));
+            notVisitedActions.retainAll(possibleActions);
+            if (!notVisitedActions.isEmpty()) {
+                if (notVisitedActions.contains(lastDirection)) {
+                    chosenAction = lastDirection;
+                } else {
+                    chosenAction = notVisitedActions.get(rand.nextInt(notVisitedActions.size()));
+                }
+            } else {
+                if (possibleActions.contains(lastDirection)) {
+                    chosenAction = lastDirection;
+                } else {
+                    chosenAction = possibleActions.get(rand.nextInt(possibleActions.size()));
+                }
+            }
         }
 
         // Register action here!
+        lastDirection = chosenAction;
         registerMove(mapUpdateEvent.getGameTick(), chosenAction);
     }
 
