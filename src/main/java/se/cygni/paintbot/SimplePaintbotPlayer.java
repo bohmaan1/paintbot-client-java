@@ -40,7 +40,9 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
     private static final int SERVER_PORT = 80;
 
     private static final GameMode GAME_MODE = GameMode.TRAINING;
-    private static final String BOT_NAME = "The Simple Painter " + (int) (Math.random() * 1000) ;
+    //private static final GameMode GAME_MODE = GameMode.TOURNAMENT;
+    
+    private static final String BOT_NAME = "Cyborg"; //The Simple Painter " + (int) (Math.random() * 1000) ;
 
     // Set to false if you don't want the game world printed every game tick.
     private static final boolean ANSI_PRINTER_ACTIVE = false;
@@ -85,6 +87,7 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
         thread.start();
     }
 
+    // Function that returns all CharacterActions towards a tile that isn't our color
     private List<CharacterAction> getNotVisitedActions(MapUtility mapUtil) {
 
         MapCoordinate playerCoord = mapUtil.getMyCoordinate();
@@ -127,20 +130,6 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
         // MapUtil contains lot's of useful methods for querying the map!
         MapUtility mapUtil = new MapUtilityImpl(mapUpdateEvent.getMap(), getPlayerId());
         
-        // Check if we're carrying a power up, if we do -> EXPLODE
-        if (mapUtil.getMyCharacterInfo().isCarryingPowerUp()) {
-            
-            // Check if we recently exploded
-            if ((mapUpdateEvent.getGameTick()-lastGameTickExplosion) > 7) {
-                List<CharacterAction> notVisitedActionsExplosion = getNotVisitedActions(mapUtil);
-                if (!notVisitedActionsExplosion.isEmpty()) {
-                    lastGameTickExplosion = mapUpdateEvent.getGameTick();
-                    registerMove(mapUpdateEvent.getGameTick(), CharacterAction.EXPLODE);
-                    return;
-                } 
-            }
-        } 
-        
         // Init chosenAction
         CharacterAction chosenAction = CharacterAction.STAY;
 
@@ -153,6 +142,26 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
                 possibleActions.add(action);
             }
         }
+
+        // Check if we're carrying a power up, consider to explode
+        if (mapUtil.getMyCharacterInfo().isCarryingPowerUp()) {
+            
+            // Check if we recently exploded, if recently then wait with explosion
+            if ((mapUpdateEvent.getGameTick()-lastGameTickExplosion) > 7) {
+
+                // Check if all of our surrounding tiles are our own, then wait with explosion
+                List<CharacterAction> notVisitedActionsExplosion = getNotVisitedActions(mapUtil);
+                if (!notVisitedActionsExplosion.isEmpty()) {
+                    
+                    // Check if we are not standing just beside a obstacle or wall, if not -> EXPLODE
+                    if (possibleActions.size() == 4) {
+                        lastGameTickExplosion = mapUpdateEvent.getGameTick();
+                        registerMove(mapUpdateEvent.getGameTick(), CharacterAction.EXPLODE);
+                        return;
+                    }
+                } 
+            }
+        } 
         
         // Getting the closest powerup
         MapCoordinate[] powerUpsCoords = mapUtil.getCoordinatesContainingPowerUps();
@@ -176,7 +185,7 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
             }
         }
 
-        // If we find a power up, calculate which direction to take
+        // If we find a power up, calculate shortest directions to take
         if (closestCoordPowerUp != null) {
             List<CharacterAction> actionsPowerUp = new ArrayList<>();
             if (playerCoord.x < closestCoordPowerUp.x) {
@@ -195,7 +204,7 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
                                         .filter(mapUtil::canIMoveInDirection)
                                         .collect(Collectors.toList());
             
-            // Move towards the power up if possible
+            // Move the shortest path towards the power up if possible
             if (!validActionsPowerUp.isEmpty()) {
                 Random rand = new Random();
                 List<CharacterAction> notVisitedActionsPowerUp = getNotVisitedActions(mapUtil);
@@ -210,7 +219,7 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
                 return;
             } 
 
-            // If it's not, there is an obstacle in front of us, then go around it
+            // If we can't move the shortest path, there is an obstacle in front of us, then go around it
             else {
                 if (actionsPowerUp.contains(CharacterAction.RIGHT) || actionsPowerUp.contains(CharacterAction.LEFT)) {
                     validActionsPowerUp.add(CharacterAction.UP);
@@ -253,46 +262,7 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
                     }
                 }
             }    
-            
-            /*
-            actionsPowerUp.retainAll(possibleActions);
-
-            if (!actionsPowerUp.isEmpty()) {
-                Random rand = new Random();
-                chosenAction = actionsPowerUp.get(rand.nextInt(actionsPowerUp.size()));
-                registerMove(mapUpdateEvent.getGameTick(), chosenAction);
-                return;
-            }*/
         }
-        /*
-        List<MapCoordinate> visitedCoords = Arrays.asList(mapUtil.getPlayerColouredCoordinates(getPlayerId()));
-        List<MapCoordinate> surroundingCoords = new ArrayList<>();
-        MapCoordinate playerCoordRight = new MapCoordinate(playerCoord.x+1,playerCoord.y);
-        MapCoordinate playerCoordLeft = new MapCoordinate(playerCoord.x-1,playerCoord.y);
-        MapCoordinate playerCoordDown = new MapCoordinate(playerCoord.x,playerCoord.y+1);
-        MapCoordinate playerCoordUp = new MapCoordinate(playerCoord.x,playerCoord.y-1);
-
-        surroundingCoords.add(playerCoordRight);
-        surroundingCoords.add(playerCoordLeft);
-        surroundingCoords.add(playerCoordDown);
-        surroundingCoords.add(playerCoordUp);
-
-        surroundingCoords.removeAll(visitedCoords);
-
-        List<CharacterAction> notVisitedActions = new ArrayList<>();
-
-        for (MapCoordinate coord : surroundingCoords) {
-            if (coord.x < playerCoord.x) {
-                notVisitedActions.add(CharacterAction.LEFT);
-            } else if (coord.x > playerCoord.x) {
-                notVisitedActions.add(CharacterAction.RIGHT);
-            } else if (coord.y < playerCoord.y) {
-                notVisitedActions.add(CharacterAction.UP);
-            } else if (coord.y > playerCoord.y) {
-                notVisitedActions.add(CharacterAction.DOWN);
-            }
-        }  
-        */
 
         List<CharacterAction> notVisitedActions = getNotVisitedActions(mapUtil);
 
@@ -318,7 +288,7 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
             }
         }
 
-        // Register action here!
+        // Register action
         lastDirection = chosenAction;
         registerMove(mapUpdateEvent.getGameTick(), chosenAction);
     }
