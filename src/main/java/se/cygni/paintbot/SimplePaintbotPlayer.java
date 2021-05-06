@@ -20,13 +20,10 @@ import se.cygni.paintbot.client.MapUtility;
 import se.cygni.paintbot.client.MapCoordinate;
 import se.cygni.paintbot.client.MapUtilityImpl;
 import java.util.stream.Collectors;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-
-// import javax.swing.colorchooser.ColorChooserComponentFactory;
 
 public class SimplePaintbotPlayer extends BasePaintbotClient {
 
@@ -40,7 +37,7 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
     private static final int SERVER_PORT = 80;
 
     private static final GameMode GAME_MODE = GameMode.TRAINING;
-    //private static final GameMode GAME_MODE = GameMode.TOURNAMENT;
+    // private static final GameMode GAME_MODE = GameMode.TOURNAMENT;
     
     private static final String BOT_NAME = "Cyborg"; //The Simple Painter " + (int) (Math.random() * 1000) ;
 
@@ -48,7 +45,7 @@ public class SimplePaintbotPlayer extends BasePaintbotClient {
     private static final boolean ANSI_PRINTER_ACTIVE = false;
     private AnsiPrinter ansiPrinter = new AnsiPrinter(ANSI_PRINTER_ACTIVE, true);
 
-    private long lastGameTickExplosion = 0;
+    private long lastGameTickExplosion = Long.MIN_VALUE;
     private CharacterAction lastDirection = CharacterAction.STAY;
 
     public static void main(String[] args) {
